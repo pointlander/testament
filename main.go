@@ -201,10 +201,10 @@ func main() {
 	net := NewNet(2, 64, 16, 1)
 	in := NewMatrix(0, 256, 1)
 	in.Data = in.Data[:cap(in.Data)]
-	position := 8
+	position := 0
 	rng := rand.New(rand.NewSource(1))
 	for position < len(data) {
-		copy(in.Data, embedding[data[position+rng.Intn(256)]])
+		copy(in.Data, embedding[data[position+rng.Intn(32)]])
 		out := nets.Fire(in)
 		out = net.Fire(out)
 		if out.Data[0] > 0 {
