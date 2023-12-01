@@ -159,4 +159,64 @@ func main() {
 		panic(err)
 	}
 	fmt.Println(len(data))
+	runes := []rune(string(data))
+	data = []byte{}
+	count := 0
+	for _, v := range runes {
+		if v < 256 {
+			data = append(data, byte(v))
+		} else {
+			count++
+		}
+	}
+	fmt.Println("unicode", count)
+
+	embedding := make([][]float32, 256)
+	for i := range embedding {
+		embedding[i] = make([]float32, 256)
+	}
+	for i, v := range data {
+		if i > 0 {
+			embedding[v][data[i-1]]++
+		}
+		if i < len(data)-1 {
+			embedding[v][data[i+1]]++
+		}
+	}
+	for i := range embedding {
+		sum := 0.0
+		for _, value := range embedding[i] {
+			sum += float64(value) * float64(value)
+		}
+		length := math.Sqrt(sum)
+		if length == 0 {
+			continue
+		}
+		for j := range embedding[i] {
+			embedding[i][j] /= float32(length)
+		}
+	}
+
+	nets := NewNet(1, 64, 256, 16)
+	net := NewNet(2, 64, 16, 2)
+	in := NewMatrix(0, 256, 1)
+	in.Data = in.Data[:cap(in.Data)]
+	position := 8
+	rng := rand.New(rand.NewSource(1))
+	for position < len(data) {
+		copy(in.Data, embedding[data[position+rng.Intn(256)]])
+		out := nets.Fire(in)
+		out = net.Fire(out)
+		if out.Data[0] > out.Data[1] {
+			position++
+		} else {
+			position--
+		}
+		if position < 0 {
+			position = 0
+		} else if position > len(data)-256 {
+			position = len(data) - 256
+		}
+		fmt.Println(position)
+	}
 }
