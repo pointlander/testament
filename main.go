@@ -13,6 +13,13 @@ import (
 	"os"
 	"sort"
 	"sync/atomic"
+
+	. "github.com/pointlander/matrix"
+)
+
+const (
+	// Samples is the number of samples
+	Samples = 256
 )
 
 // Random is a random variable
