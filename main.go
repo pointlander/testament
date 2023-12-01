@@ -198,7 +198,7 @@ func main() {
 	}
 
 	nets := NewNet(1, 64, 256, 16)
-	net := NewNet(2, 64, 16, 2)
+	net := NewNet(2, 64, 16, 1)
 	in := NewMatrix(0, 256, 1)
 	in.Data = in.Data[:cap(in.Data)]
 	position := 8
@@ -207,7 +207,7 @@ func main() {
 		copy(in.Data, embedding[data[position+rng.Intn(256)]])
 		out := nets.Fire(in)
 		out = net.Fire(out)
-		if out.Data[0] > out.Data[1] {
+		if out.Data[0] > 0 {
 			position++
 		} else {
 			position--
