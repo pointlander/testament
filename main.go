@@ -203,19 +203,14 @@ func main() {
 	in.Data = in.Data[:cap(in.Data)]
 	position := 0
 	rng := rand.New(rand.NewSource(1))
-	for position < len(data) {
+	for position < len(data)-256 {
 		copy(in.Data, embedding[data[position+rng.Intn(32)]])
 		out := nets.Fire(in)
 		out = net.Fire(out)
 		if out.Data[0] > 0 {
 			position++
-		} else {
+		} else if position > 0 {
 			position--
-		}
-		if position < 0 {
-			position = 0
-		} else if position > len(data)-256 {
-			position = len(data) - 256
 		}
 		fmt.Println(position)
 	}
