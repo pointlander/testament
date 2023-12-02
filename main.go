@@ -19,7 +19,7 @@ import (
 
 const (
 	// Samples is the number of samples
-	Samples = 256
+	Samples = 32
 )
 
 // Random is a random variable
@@ -73,7 +73,7 @@ type Sample struct {
 // Fire runs the network
 func (n *Net) Fire(input Matrix) Matrix {
 	rng, distribution, window := n.Rng, n.Distribution, atomic.LoadInt64(&n.window)
-	output := NewMatrix(0, n.Outputs, Samples)
+	output := NewMatrix(0, n.Outputs, 8*Samples)
 
 	systems := make([]Sample, 0, 8)
 	for i := 0; i < Samples; i++ {
@@ -90,16 +90,23 @@ func (n *Net) Fire(input Matrix) Matrix {
 				neurons[j].Data = append(neurons[j].Data, v)
 			}
 		}
-		outputs := NewMatrix(0, n.Outputs, 1)
+		outputs := make([]Matrix, 8)
+		for j := range outputs {
+			outputs[j] = NewMatrix(0, n.Outputs, 1)
+		}
 		for j := range neurons {
 			out := MulT(neurons[j], input)
-			output.Data = append(output.Data, out.Data[0])
-			outputs.Data = append(outputs.Data, out.Data[0])
+			for k, value := range out.Data {
+				outputs[k].Data = append(outputs[k].Data, value)
+			}
 		}
-		systems = append(systems, Sample{
-			Neurons: neurons,
-			Outputs: outputs,
-		})
+		for j := range outputs {
+			output.Data = append(output.Data, outputs[j].Data...)
+			systems = append(systems, Sample{
+				Neurons: neurons,
+				Outputs: outputs[j],
+			})
+		}
 	}
 	entropies := SelfEntropy(output, output, output)
 	for i, entropy := range entropies {
@@ -144,7 +151,11 @@ func (n *Net) Fire(input Matrix) Matrix {
 		}
 	}
 	n.Distribution = next
-	return systems[0].Outputs
+	outputs := NewMatrix(0, n.Outputs, 8)
+	for i := 0; i < 8; i++ {
+		outputs.Data = append(outputs.Data, systems[i].Outputs.Data...)
+	}
+	return outputs
 }
 
 func main() {
@@ -199,18 +210,22 @@ func main() {
 
 	nets := NewNet(1, 64, 256, 16)
 	net := NewNet(2, 64, 16, 1)
-	in := NewMatrix(0, 256, 1)
+	in := NewMatrix(0, 256, 8)
 	in.Data = in.Data[:cap(in.Data)]
 	position := 0
-	rng := rand.New(rand.NewSource(1))
+	//rng := rand.New(rand.NewSource(1))
 	for position < len(data)-256 {
-		copy(in.Data, embedding[data[position+rng.Intn(32)]])
+		for i := 0; i < 8; i++ {
+			copy(in.Data[i*256:(i+1)*256], embedding[data[position+i]])
+		}
 		out := nets.Fire(in)
 		out = net.Fire(out)
-		if out.Data[0] > 0 {
-			position++
-		} else if position > 0 {
-			position--
+		for _, value := range out.Data {
+			if value > 0 {
+				position++
+			} else if position > 0 {
+				position--
+			}
 		}
 		fmt.Println(position)
 	}
