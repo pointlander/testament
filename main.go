@@ -164,6 +164,8 @@ func (n *Net) Fire(input Matrix) Matrix {
 var (
 	// FlagLess less than mode
 	FlagLess = flag.Bool("less", false, "less than mode")
+	// FlagTest test mode
+	FlagTest = flag.Bool("test", false, "test mode")
 )
 
 func main() {
@@ -218,87 +220,110 @@ func main() {
 		}
 	}
 
-	nets := NewNet(1, 64, 256, 16)
-	net := NewNet(2, 64, 16, 8)
-	in := NewMatrix(0, 256, Batch)
-	in.Data = in.Data[:cap(in.Data)]
-	position := 0
-	//rng := rand.New(rand.NewSource(1))
-	histogram := [8]float64{}
-	for position < len(data)-256 {
-		for i := 0; i < Batch; i++ {
-			copy(in.Data[i*256:(i+1)*256], embedding[data[position+i]])
-		}
-		out := nets.Fire(in)
-		out = net.Fire(out)
-		for i := 0; i < Batch; i++ {
-			if *FlagLess {
-				if out.Data[i*Batch] < 0 {
-					position++
-					histogram[0]++
-				} else if out.Data[i*Batch+1] < 0 {
-					position += 2
-					histogram[1]++
-				} else if out.Data[i*Batch+2] < 0 {
-					position += 4
-					histogram[2]++
-				} else if out.Data[i*Batch+3] < 0 {
-					position += 8
-					histogram[3]++
-				} else if out.Data[i*Batch+4] < 0 {
-					position += 16
-					histogram[4]++
-				} else if out.Data[i*Batch+5] < 0 {
-					position += 32
-					histogram[5]++
-				} else if out.Data[i*Batch+6] < 0 {
-					position += 64
-					histogram[6]++
-				} else if out.Data[i*Batch+7] < 0 {
-					position += 128
-					histogram[7]++
-				} else if position > 0 {
-					position--
+	test := func(iterations int) [8]float64 {
+		nets := NewNet(1, 8, 256, 16)
+		net := NewNet(2, 8, 16, 6)
+		in := NewMatrix(0, 256, Batch)
+		in.Data = in.Data[:cap(in.Data)]
+		position := 0
+		//rng := rand.New(rand.NewSource(1))
+		histogram := [8]float64{}
+		for position < iterations {
+			for i := 0; i < Batch; i++ {
+				copy(in.Data[i*256:(i+1)*256], embedding[data[position+i]])
+			}
+			out := nets.Fire(in)
+			out = net.Fire(out)
+			for i := 0; i < Batch; i++ {
+				if *FlagLess {
+					if out.Data[i*Batch] < 0 {
+						position++
+						histogram[0]++
+					} else if out.Data[i*Batch+1] < 0 {
+						position += 2
+						histogram[1]++
+					} else if out.Data[i*Batch+2] < 0 {
+						position += 4
+						histogram[2]++
+					} else if out.Data[i*Batch+3] < 0 {
+						position += 8
+						histogram[3]++
+					} else if out.Data[i*Batch+4] < 0 {
+						position += 16
+						histogram[4]++
+					} else if out.Data[i*Batch+5] < 0 {
+						position += 32
+						histogram[5]++
+						/*} else if out.Data[i*Batch+6] < 0 {
+							position += 64
+							histogram[6]++
+						} else if out.Data[i*Batch+7] < 0 {
+							position += 128
+							histogram[7]++*/
+					} else if position > 0 {
+						position--
+					}
+				} else {
+					if out.Data[i*Batch] > 0 {
+						position++
+						histogram[0]++
+					} else if out.Data[i*Batch+1] > 0 {
+						position += 2
+						histogram[1]++
+					} else if out.Data[i*Batch+2] > 0 {
+						position += 4
+						histogram[2]++
+					} else if out.Data[i*Batch+3] > 0 {
+						position += 8
+						histogram[3]++
+					} else if out.Data[i*Batch+4] > 0 {
+						position += 16
+						histogram[4]++
+					} else if out.Data[i*Batch+5] > 0 {
+						position += 32
+						histogram[5]++
+						/*} else if out.Data[i*Batch+6] > 0 {
+							position += 64
+							histogram[6]++
+						} else if out.Data[i*Batch+7] > 0 {
+							position += 128
+							histogram[7]++*/
+					} else if position > 0 {
+						position--
+					}
 				}
-			} else {
-				if out.Data[i*Batch] > 0 {
-					position++
-					histogram[0]++
-				} else if out.Data[i*Batch+1] > 0 {
-					position += 2
-					histogram[1]++
-				} else if out.Data[i*Batch+2] > 0 {
-					position += 4
-					histogram[2]++
-				} else if out.Data[i*Batch+3] > 0 {
-					position += 8
-					histogram[3]++
-				} else if out.Data[i*Batch+4] > 0 {
-					position += 16
-					histogram[4]++
-				} else if out.Data[i*Batch+5] > 0 {
-					position += 32
-					histogram[5]++
-				} else if out.Data[i*Batch+6] > 0 {
-					position += 64
-					histogram[6]++
-				} else if out.Data[i*Batch+7] > 0 {
-					position += 128
-					histogram[7]++
-				} else if position > 0 {
-					position--
+				sum := 0.0
+				for _, value := range histogram {
+					sum += value
 				}
+				h := histogram
+				for i, v := range h {
+					h[i] = v / sum
+				}
+				fmt.Println(h)
 			}
-			sum := 0.0
-			for _, value := range histogram {
-				sum += value
-			}
-			h := histogram
-			for i, v := range h {
-				h[i] = v / sum
-			}
-			fmt.Println(h)
+			fmt.Println(position)
 		}
-		fmt.Println(position)
+		sum := 0.0
+		for _, value := range histogram {
+			sum += value
+		}
+		h := histogram
+		for i, v := range h {
+			h[i] = v / sum
+		}
+		return h
 	}
+
+	if *FlagTest {
+		a := test(2048)
+		*FlagLess = true
+		b := test(2048)
+		for i, v := range a {
+			fmt.Println(i, v, b[i], v-b[i])
+		}
+		return
+	}
+
+	test(len(data) - 256)
 }
