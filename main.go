@@ -209,19 +209,19 @@ func main() {
 	}
 
 	nets := NewNet(1, 64, 256, 16)
-	net := NewNet(2, 64, 16, 1)
+	net := NewNet(2, 64, 16, 2)
 	in := NewMatrix(0, 256, 8)
 	in.Data = in.Data[:cap(in.Data)]
 	position := 0
-	//rng := rand.New(rand.NewSource(1))
+	rng := rand.New(rand.NewSource(1))
 	for position < len(data)-256 {
 		for i := 0; i < 8; i++ {
-			copy(in.Data[i*256:(i+1)*256], embedding[data[position+i]])
+			copy(in.Data[i*256:(i+1)*256], embedding[data[position+i+rng.Intn(8)]])
 		}
 		out := nets.Fire(in)
 		out = net.Fire(out)
-		for _, value := range out.Data {
-			if value > 0 {
+		for i := 0; i < 8; i++ {
+			if out.Data[i*2] > 0 || out.Data[i*2+1] > 0 {
 				position++
 			} else if position > 0 {
 				position--
