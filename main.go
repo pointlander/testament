@@ -18,8 +18,10 @@ import (
 )
 
 const (
-	// Samples is the number of samples
-	Samples = 32
+	// Batch is the batch size
+	Batch = 1
+	// Samples is the number of samples per batch
+	Samples = 256 / Batch
 )
 
 // Random is a random variable
@@ -73,7 +75,7 @@ type Sample struct {
 // Fire runs the network
 func (n *Net) Fire(input Matrix) Matrix {
 	rng, distribution, window := n.Rng, n.Distribution, atomic.LoadInt64(&n.window)
-	output := NewMatrix(0, n.Outputs, 8*Samples)
+	output := NewMatrix(0, n.Outputs, Batch*Samples)
 
 	systems := make([]Sample, 0, 8)
 	for i := 0; i < Samples; i++ {
@@ -90,7 +92,7 @@ func (n *Net) Fire(input Matrix) Matrix {
 				neurons[j].Data = append(neurons[j].Data, v)
 			}
 		}
-		outputs := make([]Matrix, 8)
+		outputs := make([]Matrix, Batch)
 		for j := range outputs {
 			outputs[j] = NewMatrix(0, n.Outputs, 1)
 		}
@@ -151,8 +153,8 @@ func (n *Net) Fire(input Matrix) Matrix {
 		}
 	}
 	n.Distribution = next
-	outputs := NewMatrix(0, n.Outputs, 8)
-	for i := 0; i < 8; i++ {
+	outputs := NewMatrix(0, n.Outputs, Batch)
+	for i := 0; i < Batch; i++ {
 		outputs.Data = append(outputs.Data, systems[i].Outputs.Data...)
 	}
 	return outputs
@@ -209,20 +211,34 @@ func main() {
 	}
 
 	nets := NewNet(1, 64, 256, 16)
-	net := NewNet(2, 64, 16, 2)
-	in := NewMatrix(0, 256, 8)
+	net := NewNet(2, 64, 16, 8)
+	in := NewMatrix(0, 256, Batch)
 	in.Data = in.Data[:cap(in.Data)]
 	position := 0
 	rng := rand.New(rand.NewSource(1))
 	for position < len(data)-256 {
-		for i := 0; i < 8; i++ {
-			copy(in.Data[i*256:(i+1)*256], embedding[data[position+i+rng.Intn(8)]])
+		for i := 0; i < Batch; i++ {
+			copy(in.Data[i*256:(i+1)*256], embedding[data[position+i+rng.Intn(256)]])
 		}
 		out := nets.Fire(in)
 		out = net.Fire(out)
-		for i := 0; i < 8; i++ {
-			if out.Data[i*2] > 0 || out.Data[i*2+1] > 0 {
+		for i := 0; i < Batch; i++ {
+			if out.Data[i] > 0 {
 				position++
+			} else if out.Data[i+1] > 0 {
+				position += 2
+			} else if out.Data[i+2] > 0 {
+				position += 4
+			} else if out.Data[i+3] > 0 {
+				position += 8
+			} else if out.Data[i+4] > 0 {
+				position += 16
+			} else if out.Data[i+5] > 0 {
+				position += 32
+			} else if out.Data[i+6] > 0 {
+				position += 64
+			} else if out.Data[i+7] > 0 {
+				position += 128
 			} else if position > 0 {
 				position--
 			}
