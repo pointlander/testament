@@ -6,6 +6,7 @@ package main
 
 import (
 	"compress/bzip2"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"math"
@@ -160,7 +161,14 @@ func (n *Net) Fire(input Matrix) Matrix {
 	return outputs
 }
 
+var (
+	// FlagLess less than mode
+	FlagLess = flag.Bool("less", false, "less than mode")
+)
+
 func main() {
+	flag.Parse()
+
 	input, err := os.Open("10.txt.utf-8.bz2")
 	if err != nil {
 		panic(err)
@@ -216,7 +224,7 @@ func main() {
 	in.Data = in.Data[:cap(in.Data)]
 	position := 0
 	//rng := rand.New(rand.NewSource(1))
-	histogram := [8]int{}
+	histogram := [8]float64{}
 	for position < len(data)-256 {
 		for i := 0; i < Batch; i++ {
 			copy(in.Data[i*256:(i+1)*256], embedding[data[position+i]])
@@ -224,34 +232,72 @@ func main() {
 		out := nets.Fire(in)
 		out = net.Fire(out)
 		for i := 0; i < Batch; i++ {
-			if out.Data[i*Batch] > 0 {
-				position++
-				histogram[0]++
-			} else if out.Data[i*Batch+1] > 0 {
-				position += 2
-				histogram[1]++
-			} else if out.Data[i*Batch+2] > 0 {
-				position += 4
-				histogram[2]++
-			} else if out.Data[i*Batch+3] > 0 {
-				position += 8
-				histogram[3]++
-			} else if out.Data[i*Batch+4] > 0 {
-				position += 16
-				histogram[4]++
-			} else if out.Data[i*Batch+5] > 0 {
-				position += 32
-				histogram[5]++
-			} else if out.Data[i*Batch+6] > 0 {
-				position += 64
-				histogram[6]++
-			} else if out.Data[i*Batch+7] > 0 {
-				position += 128
-				histogram[7]++
-			} else if position > 0 {
-				position--
+			if *FlagLess {
+				if out.Data[i*Batch] < 0 {
+					position++
+					histogram[0]++
+				} else if out.Data[i*Batch+1] < 0 {
+					position += 2
+					histogram[1]++
+				} else if out.Data[i*Batch+2] < 0 {
+					position += 4
+					histogram[2]++
+				} else if out.Data[i*Batch+3] < 0 {
+					position += 8
+					histogram[3]++
+				} else if out.Data[i*Batch+4] < 0 {
+					position += 16
+					histogram[4]++
+				} else if out.Data[i*Batch+5] < 0 {
+					position += 32
+					histogram[5]++
+				} else if out.Data[i*Batch+6] < 0 {
+					position += 64
+					histogram[6]++
+				} else if out.Data[i*Batch+7] < 0 {
+					position += 128
+					histogram[7]++
+				} else if position > 0 {
+					position--
+				}
+			} else {
+				if out.Data[i*Batch] > 0 {
+					position++
+					histogram[0]++
+				} else if out.Data[i*Batch+1] > 0 {
+					position += 2
+					histogram[1]++
+				} else if out.Data[i*Batch+2] > 0 {
+					position += 4
+					histogram[2]++
+				} else if out.Data[i*Batch+3] > 0 {
+					position += 8
+					histogram[3]++
+				} else if out.Data[i*Batch+4] > 0 {
+					position += 16
+					histogram[4]++
+				} else if out.Data[i*Batch+5] > 0 {
+					position += 32
+					histogram[5]++
+				} else if out.Data[i*Batch+6] > 0 {
+					position += 64
+					histogram[6]++
+				} else if out.Data[i*Batch+7] > 0 {
+					position += 128
+					histogram[7]++
+				} else if position > 0 {
+					position--
+				}
 			}
-			fmt.Println(histogram)
+			sum := 0.0
+			for _, value := range histogram {
+				sum += value
+			}
+			h := histogram
+			for i, v := range h {
+				h[i] = v / sum
+			}
+			fmt.Println(h)
 		}
 		fmt.Println(position)
 	}
