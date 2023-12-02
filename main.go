@@ -215,11 +215,11 @@ func main() {
 	in := NewMatrix(0, 256, Batch)
 	in.Data = in.Data[:cap(in.Data)]
 	position := 0
-	rng := rand.New(rand.NewSource(1))
+	//rng := rand.New(rand.NewSource(1))
 	histogram := [8]int{}
 	for position < len(data)-256 {
 		for i := 0; i < Batch; i++ {
-			copy(in.Data[i*256:(i+1)*256], embedding[data[position+i+rng.Intn(256)]])
+			copy(in.Data[i*256:(i+1)*256], embedding[data[position+i]])
 		}
 		out := nets.Fire(in)
 		out = net.Fire(out)
