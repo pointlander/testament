@@ -216,6 +216,7 @@ func main() {
 	in.Data = in.Data[:cap(in.Data)]
 	position := 0
 	rng := rand.New(rand.NewSource(1))
+	histogram := [8]int{}
 	for position < len(data)-256 {
 		for i := 0; i < Batch; i++ {
 			copy(in.Data[i*256:(i+1)*256], embedding[data[position+i+rng.Intn(256)]])
@@ -223,25 +224,34 @@ func main() {
 		out := nets.Fire(in)
 		out = net.Fire(out)
 		for i := 0; i < Batch; i++ {
-			if out.Data[i] > 0 {
+			if out.Data[i*Batch] > 0 {
 				position++
-			} else if out.Data[i+1] > 0 {
+				histogram[0]++
+			} else if out.Data[i*Batch+1] > 0 {
 				position += 2
-			} else if out.Data[i+2] > 0 {
+				histogram[1]++
+			} else if out.Data[i*Batch+2] > 0 {
 				position += 4
-			} else if out.Data[i+3] > 0 {
+				histogram[2]++
+			} else if out.Data[i*Batch+3] > 0 {
 				position += 8
-			} else if out.Data[i+4] > 0 {
+				histogram[3]++
+			} else if out.Data[i*Batch+4] > 0 {
 				position += 16
-			} else if out.Data[i+5] > 0 {
+				histogram[4]++
+			} else if out.Data[i*Batch+5] > 0 {
 				position += 32
-			} else if out.Data[i+6] > 0 {
+				histogram[5]++
+			} else if out.Data[i*Batch+6] > 0 {
 				position += 64
-			} else if out.Data[i+7] > 0 {
+				histogram[6]++
+			} else if out.Data[i*Batch+7] > 0 {
 				position += 128
+				histogram[7]++
 			} else if position > 0 {
 				position--
 			}
+			fmt.Println(histogram)
 		}
 		fmt.Println(position)
 	}
