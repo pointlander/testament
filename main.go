@@ -15,6 +15,7 @@ import (
 	"sort"
 	"sync/atomic"
 
+	"github.com/fatih/color"
 	. "github.com/pointlander/matrix"
 )
 
@@ -171,6 +172,8 @@ var (
 func main() {
 	flag.Parse()
 
+	color.Blue("Hello World!")
+
 	input, err := os.Open("10.txt.utf-8.bz2")
 	if err != nil {
 		panic(err)
@@ -220,110 +223,53 @@ func main() {
 		}
 	}
 
-	test := func(iterations int) [8]float64 {
+	test := func(iterations int) {
 		nets := NewNet(1, 8, 256, 16)
-		net := NewNet(2, 8, 16, 6)
+		net := NewNet(2, 8, 16, 3)
 		in := NewMatrix(0, 256, Batch)
 		in.Data = in.Data[:cap(in.Data)]
 		position := 0
 		//rng := rand.New(rand.NewSource(1))
-		histogram := [8]float64{}
 		for position < iterations {
 			for i := 0; i < Batch; i++ {
 				copy(in.Data[i*256:(i+1)*256], embedding[data[position+i]])
 			}
 			out := nets.Fire(in)
 			out = net.Fire(out)
-			for i := 0; i < Batch; i++ {
-				if *FlagLess {
-					if out.Data[i*Batch] < 0 {
-						position++
-						histogram[0]++
-					} else if out.Data[i*Batch+1] < 0 {
-						position += 2
-						histogram[1]++
-					} else if out.Data[i*Batch+2] < 0 {
-						position += 4
-						histogram[2]++
-					} else if out.Data[i*Batch+3] < 0 {
-						position += 8
-						histogram[3]++
-					} else if out.Data[i*Batch+4] < 0 {
-						position += 16
-						histogram[4]++
-					} else if out.Data[i*Batch+5] < 0 {
-						position += 32
-						histogram[5]++
-						/*} else if out.Data[i*Batch+6] < 0 {
-							position += 64
-							histogram[6]++
-						} else if out.Data[i*Batch+7] < 0 {
-							position += 128
-							histogram[7]++*/
-					} else if position > 0 {
-						position--
-					}
-				} else {
-					if out.Data[i*Batch] > 0 {
-						position++
-						histogram[0]++
-					} else if out.Data[i*Batch+1] > 0 {
-						position += 2
-						histogram[1]++
-					} else if out.Data[i*Batch+2] > 0 {
-						position += 4
-						histogram[2]++
-					} else if out.Data[i*Batch+3] > 0 {
-						position += 8
-						histogram[3]++
-					} else if out.Data[i*Batch+4] > 0 {
-						position += 16
-						histogram[4]++
-					} else if out.Data[i*Batch+5] > 0 {
-						position += 32
-						histogram[5]++
-						/*} else if out.Data[i*Batch+6] > 0 {
-							position += 64
-							histogram[6]++
-						} else if out.Data[i*Batch+7] > 0 {
-							position += 128
-							histogram[7]++*/
-					} else if position > 0 {
-						position--
-					}
-				}
-				sum := 0.0
-				for _, value := range histogram {
-					sum += value
-				}
-				h := histogram
-				for i, v := range h {
-					h[i] = v / sum
-				}
-				fmt.Println(h)
+			c := 0
+			if out.Data[0] > 0 {
+				c |= 1
 			}
-			fmt.Println(position)
+			if out.Data[1] > 0 {
+				c |= 2
+			}
+			if out.Data[2] > 0 {
+				c |= 4
+			}
+			if c > 6 {
+				c = 6
+			}
+			symbol := ""
+			switch c {
+			case 0:
+				symbol = color.BlackString(string(data[position]))
+			case 1:
+				symbol = color.BlueString(string(data[position]))
+			case 2:
+				symbol = color.CyanString(string(data[position]))
+			case 3:
+				symbol = color.GreenString(string(data[position]))
+			case 4:
+				symbol = color.RedString(string(data[position]))
+			case 5:
+				symbol = color.YellowString(string(data[position]))
+			case 6:
+				symbol = color.WhiteString(string(data[position]))
+			}
+			fmt.Printf(symbol)
+			position++
 		}
-		sum := 0.0
-		for _, value := range histogram {
-			sum += value
-		}
-		h := histogram
-		for i, v := range h {
-			h[i] = v / sum
-		}
-		return h
 	}
 
-	if *FlagTest {
-		a := test(2048)
-		*FlagLess = true
-		b := test(2048)
-		for i, v := range a {
-			fmt.Println(i, v, b[i], v-b[i])
-		}
-		return
-	}
-
-	test(len(data) - 256)
+	test(len(data))
 }
