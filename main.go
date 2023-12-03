@@ -276,7 +276,7 @@ func main() {
 			case 5:
 				symbol = color.YellowString(string(data[position]))
 			case 6:
-				symbol = color.WhiteString(string(data[position]))
+				symbol = color.MagentaString(string(data[position]))
 			}
 			fmt.Printf(symbol)
 			position++
