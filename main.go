@@ -13,6 +13,7 @@ import (
 	"math/rand"
 	"os"
 	"sort"
+	"strings"
 	"sync/atomic"
 
 	"github.com/fatih/color"
@@ -163,10 +164,8 @@ func (n *Net) Fire(input Matrix) Matrix {
 }
 
 var (
-	// FlagLess less than mode
-	FlagLess = flag.Bool("less", false, "less than mode")
-	// FlagTest test mode
-	FlagTest = flag.Bool("test", false, "test mode")
+	// FlagFile is the file to process
+	FlagFile = flag.String("f", "10.txt.utf-8.bz2", "the file to process")
 )
 
 func main() {
@@ -174,28 +173,41 @@ func main() {
 
 	color.Blue("Hello World!")
 
-	input, err := os.Open("10.txt.utf-8.bz2")
-	if err != nil {
-		panic(err)
-	}
-	defer input.Close()
-	reader := bzip2.NewReader(input)
-	data, err := ioutil.ReadAll(reader)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println(len(data))
-	runes := []rune(string(data))
-	data = []byte{}
-	count := 0
-	for _, v := range runes {
-		if v < 256 {
-			data = append(data, byte(v))
-		} else {
-			count++
+	data := []byte{}
+	if strings.HasSuffix(*FlagFile, ".bz2") {
+		input, err := os.Open(*FlagFile)
+		if err != nil {
+			panic(err)
 		}
+		defer input.Close()
+		reader := bzip2.NewReader(input)
+		d, err := ioutil.ReadAll(reader)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(len(d))
+		runes := []rune(string(d))
+		count := 0
+		for _, v := range runes {
+			if v < 256 {
+				data = append(data, byte(v))
+			} else {
+				count++
+			}
+		}
+		fmt.Println("unicode", count)
+	} else {
+		input, err := os.Open(*FlagFile)
+		if err != nil {
+			panic(err)
+		}
+		defer input.Close()
+		d, err := ioutil.ReadAll(input)
+		if err != nil {
+			panic(err)
+		}
+		data = d
 	}
-	fmt.Println("unicode", count)
 
 	embedding := make([][]float32, 256)
 	for i := range embedding {
