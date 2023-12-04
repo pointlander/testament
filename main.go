@@ -331,9 +331,6 @@ func main() {
 			if out.Data[2] > 0 {
 				c |= 4
 			}
-			if c > 6 {
-				c = 6
-			}
 			symbol := ""
 			switch c {
 			case 0:
@@ -350,6 +347,8 @@ func main() {
 				symbol = color.YellowString(string(data[position]))
 			case 6:
 				symbol = color.MagentaString(string(data[position]))
+			case 7:
+				symbol = color.HiMagentaString(string(data[position]))
 			}
 			fmt.Printf(symbol)
 			position++
