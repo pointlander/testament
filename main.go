@@ -310,7 +310,7 @@ func main() {
 
 	test := func(iterations int) {
 		//nets := NewNet(1, 8, 256, 3)
-		net := NewNet(2, 8, 256, 2)
+		net := NewNet(2, 8, 256, 3)
 		in := NewMatrix(0, 256, Batch)
 		in.Data = in.Data[:cap(in.Data)]
 		position := 0
@@ -328,12 +328,12 @@ func main() {
 			if out.Data[1] > 0 {
 				c |= 2
 			}
-			/*if out.Data[2] > 0 {
+			if out.Data[2] > 0 {
 				c |= 4
 			}
 			if c > 6 {
 				c = 6
-			}*/
+			}
 			symbol := ""
 			switch c {
 			case 0:
