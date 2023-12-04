@@ -6,6 +6,7 @@ package main
 
 import (
 	"compress/bzip2"
+	"encoding/gob"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -166,12 +167,88 @@ func (n *Net) Fire(input Matrix) Matrix {
 var (
 	// FlagFile is the file to process
 	FlagFile = flag.String("f", "10.txt.utf-8.bz2", "the file to process")
+	// FlagLearn is the learning mode
+	FlagLearn = flag.Bool("learn", false, "learning mode")
 )
 
 func main() {
 	flag.Parse()
 
 	color.Blue("Hello World!")
+
+	var embedding [256][256]float32
+	if *FlagLearn {
+		var process func(file string)
+		process = func(file string) {
+			fmt.Println(file)
+			dirs, err := os.ReadDir(file)
+			if err != nil {
+				panic(err)
+			}
+			for _, v := range dirs {
+				if v.IsDir() {
+					process(file + v.Name() + "/")
+				} else {
+					if strings.HasSuffix(v.Name(), ".go") {
+						fmt.Println(v.Name())
+						input, err := os.Open(file + v.Name())
+						if err != nil {
+							panic(err)
+						}
+						data, err := ioutil.ReadAll(input)
+						if err != nil {
+							panic(err)
+						}
+						for i, v := range data {
+							if i > 0 {
+								embedding[v][data[i-1]]++
+							}
+							if i < len(data)-1 {
+								embedding[v][data[i+1]]++
+							}
+						}
+						input.Close()
+					}
+				}
+			}
+		}
+		process("/home/pointlander/projects/testament/golang/go/src/")
+		for i := range embedding {
+			sum := 0.0
+			for _, value := range embedding[i] {
+				sum += float64(value) * float64(value)
+			}
+			length := math.Sqrt(sum)
+			if length == 0 {
+				continue
+			}
+			for j := range embedding[i] {
+				embedding[i][j] /= float32(length)
+			}
+		}
+		output, err := os.Create("embedding.gob")
+		if err != nil {
+			panic(err)
+		}
+		defer output.Close()
+		encoder := gob.NewEncoder(output)
+		err = encoder.Encode(&embedding)
+		if err != nil {
+			panic(err)
+		}
+		return
+	} else {
+		input, err := os.Open("embedding.gob")
+		if err != nil {
+			panic(err)
+		}
+		defer input.Close()
+		decoder := gob.NewDecoder(input)
+		err = decoder.Decode(&embedding)
+		if err != nil {
+			panic(err)
+		}
+	}
 
 	data := []byte{}
 	if strings.HasSuffix(*FlagFile, ".bz2") {
@@ -196,6 +273,28 @@ func main() {
 			}
 		}
 		fmt.Println("unicode", count)
+		embedding = [256][256]float32{}
+		for i, v := range data {
+			if i > 0 {
+				embedding[v][data[i-1]]++
+			}
+			if i < len(data)-1 {
+				embedding[v][data[i+1]]++
+			}
+		}
+		for i := range embedding {
+			sum := 0.0
+			for _, value := range embedding[i] {
+				sum += float64(value) * float64(value)
+			}
+			length := math.Sqrt(sum)
+			if length == 0 {
+				continue
+			}
+			for j := range embedding[i] {
+				embedding[i][j] /= float32(length)
+			}
+		}
 	} else {
 		input, err := os.Open(*FlagFile)
 		if err != nil {
@@ -209,45 +308,19 @@ func main() {
 		data = d
 	}
 
-	embedding := make([][]float32, 256)
-	for i := range embedding {
-		embedding[i] = make([]float32, 256)
-	}
-	for i, v := range data {
-		if i > 0 {
-			embedding[v][data[i-1]]++
-		}
-		if i < len(data)-1 {
-			embedding[v][data[i+1]]++
-		}
-	}
-	for i := range embedding {
-		sum := 0.0
-		for _, value := range embedding[i] {
-			sum += float64(value) * float64(value)
-		}
-		length := math.Sqrt(sum)
-		if length == 0 {
-			continue
-		}
-		for j := range embedding[i] {
-			embedding[i][j] /= float32(length)
-		}
-	}
-
 	test := func(iterations int) {
-		nets := NewNet(1, 8, 256, 16)
-		net := NewNet(2, 8, 16, 3)
+		//nets := NewNet(1, 8, 256, 3)
+		net := NewNet(2, 8, 256, 2)
 		in := NewMatrix(0, 256, Batch)
 		in.Data = in.Data[:cap(in.Data)]
 		position := 0
 		//rng := rand.New(rand.NewSource(1))
 		for position < iterations {
 			for i := 0; i < Batch; i++ {
-				copy(in.Data[i*256:(i+1)*256], embedding[data[position+i]])
+				copy(in.Data[i*256:(i+1)*256], embedding[data[position+i]][:])
 			}
-			out := nets.Fire(in)
-			out = net.Fire(out)
+			//out := nets.Fire(in)
+			out := net.Fire(in)
 			c := 0
 			if out.Data[0] > 0 {
 				c |= 1
@@ -255,12 +328,12 @@ func main() {
 			if out.Data[1] > 0 {
 				c |= 2
 			}
-			if out.Data[2] > 0 {
+			/*if out.Data[2] > 0 {
 				c |= 4
 			}
 			if c > 6 {
 				c = 6
-			}
+			}*/
 			symbol := ""
 			switch c {
 			case 0:
@@ -268,11 +341,11 @@ func main() {
 			case 1:
 				symbol = color.BlueString(string(data[position]))
 			case 2:
-				symbol = color.CyanString(string(data[position]))
+				symbol = color.RedString(string(data[position]))
 			case 3:
 				symbol = color.GreenString(string(data[position]))
 			case 4:
-				symbol = color.RedString(string(data[position]))
+				symbol = color.CyanString(string(data[position]))
 			case 5:
 				symbol = color.YellowString(string(data[position]))
 			case 6:
