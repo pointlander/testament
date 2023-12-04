@@ -169,6 +169,8 @@ var (
 	FlagFile = flag.String("f", "10.txt.utf-8.bz2", "the file to process")
 	// FlagLearn is the learning mode
 	FlagLearn = flag.Bool("learn", false, "learning mode")
+	// FlagWander is wandering mode
+	FlagWander = flag.Bool("w", false, "wander mode")
 )
 
 func main() {
@@ -306,6 +308,36 @@ func main() {
 			panic(err)
 		}
 		data = d
+	}
+
+	if *FlagWander {
+		net := NewNet(2, 8, 256, 16)
+		in := NewMatrix(0, 256, Batch)
+		in.Data = in.Data[:cap(in.Data)]
+		position, length := 0, len(data)
+		seen := make(map[int]bool, 8)
+		for len(seen) != length {
+			for i := 0; i < Batch; i++ {
+				copy(in.Data[i*256:(i+1)*256], embedding[data[position]][:])
+			}
+			out := net.Fire(in)
+			c := 0
+			for i, v := range out.Data {
+				if v > 0 {
+					c |= 1 << i
+				}
+			}
+			seen[position] = true
+			if len(seen) == length {
+				break
+			}
+			position = c % length
+			for seen[position] {
+				position = (position + 1) % length
+			}
+			fmt.Println(position, string(data[position]))
+		}
+		return
 	}
 
 	test := func(iterations int) {
