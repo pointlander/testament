@@ -310,14 +310,23 @@ func main() {
 
 	test := func(iterations int) {
 		//nets := NewNet(1, 8, 256, 3)
-		net := NewNet(2, 8, 256, 3)
-		in := NewMatrix(0, 256, Batch)
+		net := NewNet(2, 8, 256+64, 3)
+		in := NewMatrix(0, 256+64, Batch)
 		in.Data = in.Data[:cap(in.Data)]
 		position := 0
 		//rng := rand.New(rand.NewSource(1))
 		for position < iterations {
 			for i := 0; i < Batch; i++ {
 				copy(in.Data[i*256:(i+1)*256], embedding[data[position+i]][:])
+			}
+			index := uint64(position)
+			for i := 0; i < 64; i++ {
+				if index&1 == 1 {
+					in.Data[256+i] = 1
+				} else {
+					in.Data[256+i] = 0
+				}
+				index >>= 1
 			}
 			//out := nets.Fire(in)
 			out := net.Fire(in)
