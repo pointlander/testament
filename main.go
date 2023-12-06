@@ -9,6 +9,7 @@ import (
 	"encoding/gob"
 	"flag"
 	"fmt"
+	"hash/fnv"
 	"io/ioutil"
 	"math"
 	"math/rand"
@@ -27,7 +28,7 @@ const (
 	// Samples is the number of samples per batch
 	Samples = 256 / Batch
 	// Size is the size of the embedding
-	Size = 16
+	Size = 32
 )
 
 // Random is a random variable
@@ -277,7 +278,7 @@ func main() {
 			}
 		}
 		fmt.Println("unicode", count)
-		embedding = [256][Size]float32{}
+		/*embedding = [256][Size]float32{}
 		for i, v := range data {
 			if i > 0 {
 				embedding[v][data[i-1]]++
@@ -298,7 +299,7 @@ func main() {
 			for j := range embedding[i] {
 				embedding[i][j] /= float32(length)
 			}
-		}
+		}*/
 	} else {
 		input, err := os.Open(*FlagFile)
 		if err != nil {
@@ -369,9 +370,24 @@ func main() {
 		in.Data = in.Data[:cap(in.Data)]
 		position := 0
 		//rng := rand.New(rand.NewSource(1))
+		h := fnv.New32()
 		for position < iterations {
 			for i := 0; i < Batch; i++ {
-				copy(in.Data[i*Size:(i+1)*Size], embedding[data[position+i]][:])
+				h.Reset()
+				h.Write(data[position+i : position+i+1])
+				rng := rand.New(rand.NewSource(int64(h.Sum32())))
+				embedding := [256]float32{}
+				sum := 0.0
+				for i := range embedding {
+					v := rng.NormFloat64()
+					sum += v * v
+					embedding[i] = float32(v)
+				}
+				length := float32(math.Sqrt(sum))
+				for i, v := range embedding {
+					embedding[i] = v / length
+				}
+				copy(in.Data[i*Size:(i+1)*Size], embedding[:])
 			}
 			/*index := uint64(position)
 			for i := 0; i < 64; i++ {
