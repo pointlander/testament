@@ -6,7 +6,6 @@ package main
 
 import (
 	"compress/bzip2"
-	"encoding/gob"
 	"flag"
 	"fmt"
 	"hash/fnv"
@@ -170,8 +169,6 @@ func (n *Net) Fire(input Matrix) Matrix {
 var (
 	// FlagFile is the file to process
 	FlagFile = flag.String("f", "10.txt.utf-8.bz2", "the file to process")
-	// FlagLearn is the learning mode
-	FlagLearn = flag.Bool("learn", false, "learning mode")
 	// FlagWander is wandering mode
 	FlagWander = flag.Bool("w", false, "wander mode")
 )
@@ -180,80 +177,6 @@ func main() {
 	flag.Parse()
 
 	color.Blue("Hello World!")
-
-	var embedding [256][Size]float32
-	if *FlagLearn {
-		var process func(file string)
-		process = func(file string) {
-			fmt.Println(file)
-			dirs, err := os.ReadDir(file)
-			if err != nil {
-				panic(err)
-			}
-			for _, v := range dirs {
-				if v.IsDir() {
-					process(file + v.Name() + "/")
-				} else {
-					if strings.HasSuffix(v.Name(), ".go") {
-						fmt.Println(v.Name())
-						input, err := os.Open(file + v.Name())
-						if err != nil {
-							panic(err)
-						}
-						data, err := ioutil.ReadAll(input)
-						if err != nil {
-							panic(err)
-						}
-						for i, v := range data {
-							if i > 0 {
-								embedding[v][data[i-1]]++
-							}
-							if i < len(data)-1 {
-								embedding[v][data[i+1]]++
-							}
-						}
-						input.Close()
-					}
-				}
-			}
-		}
-		process("/home/pointlander/projects/testament/golang/go/src/")
-		for i := range embedding {
-			sum := 0.0
-			for _, value := range embedding[i] {
-				sum += float64(value) * float64(value)
-			}
-			length := math.Sqrt(sum)
-			if length == 0 {
-				continue
-			}
-			for j := range embedding[i] {
-				embedding[i][j] /= float32(length)
-			}
-		}
-		output, err := os.Create("embedding.gob")
-		if err != nil {
-			panic(err)
-		}
-		defer output.Close()
-		encoder := gob.NewEncoder(output)
-		err = encoder.Encode(&embedding)
-		if err != nil {
-			panic(err)
-		}
-		return
-	} /*else {
-		input, err := os.Open("embedding.gob")
-		if err != nil {
-			panic(err)
-		}
-		defer input.Close()
-		decoder := gob.NewDecoder(input)
-		err = decoder.Decode(&embedding)
-		if err != nil {
-			panic(err)
-		}
-	}*/
 
 	data := []byte{}
 	if strings.HasSuffix(*FlagFile, ".bz2") {
@@ -278,28 +201,6 @@ func main() {
 			}
 		}
 		fmt.Println("unicode", count)
-		/*embedding = [256][Size]float32{}
-		for i, v := range data {
-			if i > 0 {
-				embedding[v][data[i-1]]++
-			}
-			if i < len(data)-1 {
-				embedding[v][data[i+1]]++
-			}
-		}
-		for i := range embedding {
-			sum := 0.0
-			for _, value := range embedding[i] {
-				sum += float64(value) * float64(value)
-			}
-			length := math.Sqrt(sum)
-			if length == 0 {
-				continue
-			}
-			for j := range embedding[i] {
-				embedding[i][j] /= float32(length)
-			}
-		}*/
 	} else {
 		input, err := os.Open(*FlagFile)
 		if err != nil {
@@ -319,9 +220,24 @@ func main() {
 		in.Data = in.Data[:cap(in.Data)]
 		position, length := 0, len(data)
 		seen := make(map[int]bool, 8)
+		h := fnv.New32()
 		for len(seen) != length {
 			for i := 0; i < Batch; i++ {
-				copy(in.Data[i*Size:(i+1)*Size], embedding[data[position]][:])
+				h.Reset()
+				h.Write(data[position+i : position+i+1])
+				rng := rand.New(rand.NewSource(int64(h.Sum32())))
+				embedding := [256]float32{}
+				sum := 0.0
+				for i := range embedding {
+					v := rng.NormFloat64()
+					sum += v * v
+					embedding[i] = float32(v)
+				}
+				length := float32(math.Sqrt(sum))
+				for i, v := range embedding {
+					embedding[i] = v / length
+				}
+				copy(in.Data[i*Size:(i+1)*Size], embedding[:])
 			}
 			out := net.Fire(in)
 			c := 0
@@ -343,33 +259,11 @@ func main() {
 		return
 	}
 
-	rng := rand.New(rand.NewSource(1))
-	for i := 0; i < len(embedding); i++ {
-		for j := 0; j < len(embedding[i]); j++ {
-			embedding[i][j] = float32(rng.NormFloat64())
-		}
-	}
-	for i := range embedding {
-		sum := 0.0
-		for _, value := range embedding[i] {
-			sum += float64(value) * float64(value)
-		}
-		length := math.Sqrt(sum)
-		if length == 0 {
-			continue
-		}
-		for j := range embedding[i] {
-			embedding[i][j] /= float32(length)
-		}
-	}
-
 	test := func(iterations int) {
-		//nets := NewNet(1, 8, Size, 3)
 		net := NewNet(2, 8, Size, 3)
 		in := NewMatrix(0, Size, Batch)
 		in.Data = in.Data[:cap(in.Data)]
 		position := 0
-		//rng := rand.New(rand.NewSource(1))
 		h := fnv.New32()
 		for position < iterations {
 			for i := 0; i < Batch; i++ {
@@ -389,16 +283,6 @@ func main() {
 				}
 				copy(in.Data[i*Size:(i+1)*Size], embedding[:])
 			}
-			/*index := uint64(position)
-			for i := 0; i < 64; i++ {
-				if index&1 == 1 {
-					in.Data[Size+i] = 1
-				} else {
-					in.Data[Size+i] = 0
-				}
-				index >>= 1
-			}*/
-			//out := nets.Fire(in)
 			out := net.Fire(in)
 			c := 0
 			if out.Data[0] > 0 {
