@@ -26,6 +26,8 @@ const (
 	Batch = 1
 	// Samples is the number of samples per batch
 	Samples = 256 / Batch
+	// Size is the size of the embedding
+	Size = 16
 )
 
 // Random is a random variable
@@ -178,7 +180,7 @@ func main() {
 
 	color.Blue("Hello World!")
 
-	var embedding [256][256]float32
+	var embedding [256][Size]float32
 	if *FlagLearn {
 		var process func(file string)
 		process = func(file string) {
@@ -239,7 +241,7 @@ func main() {
 			panic(err)
 		}
 		return
-	} else {
+	} /*else {
 		input, err := os.Open("embedding.gob")
 		if err != nil {
 			panic(err)
@@ -250,7 +252,7 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-	}
+	}*/
 
 	data := []byte{}
 	if strings.HasSuffix(*FlagFile, ".bz2") {
@@ -275,7 +277,7 @@ func main() {
 			}
 		}
 		fmt.Println("unicode", count)
-		embedding = [256][256]float32{}
+		embedding = [256][Size]float32{}
 		for i, v := range data {
 			if i > 0 {
 				embedding[v][data[i-1]]++
@@ -311,14 +313,14 @@ func main() {
 	}
 
 	if *FlagWander {
-		net := NewNet(2, 8, 256, 16)
-		in := NewMatrix(0, 256, Batch)
+		net := NewNet(2, 8, Size, 16)
+		in := NewMatrix(0, Size, Batch)
 		in.Data = in.Data[:cap(in.Data)]
 		position, length := 0, len(data)
 		seen := make(map[int]bool, 8)
 		for len(seen) != length {
 			for i := 0; i < Batch; i++ {
-				copy(in.Data[i*256:(i+1)*256], embedding[data[position]][:])
+				copy(in.Data[i*Size:(i+1)*Size], embedding[data[position]][:])
 			}
 			out := net.Fire(in)
 			c := 0
@@ -340,26 +342,46 @@ func main() {
 		return
 	}
 
+	rng := rand.New(rand.NewSource(1))
+	for i := 0; i < len(embedding); i++ {
+		for j := 0; j < len(embedding[i]); j++ {
+			embedding[i][j] = float32(rng.NormFloat64())
+		}
+	}
+	for i := range embedding {
+		sum := 0.0
+		for _, value := range embedding[i] {
+			sum += float64(value) * float64(value)
+		}
+		length := math.Sqrt(sum)
+		if length == 0 {
+			continue
+		}
+		for j := range embedding[i] {
+			embedding[i][j] /= float32(length)
+		}
+	}
+
 	test := func(iterations int) {
-		//nets := NewNet(1, 8, 256, 3)
-		net := NewNet(2, 8, 256+64, 3)
-		in := NewMatrix(0, 256+64, Batch)
+		//nets := NewNet(1, 8, Size, 3)
+		net := NewNet(2, 8, Size, 3)
+		in := NewMatrix(0, Size, Batch)
 		in.Data = in.Data[:cap(in.Data)]
 		position := 0
 		//rng := rand.New(rand.NewSource(1))
 		for position < iterations {
 			for i := 0; i < Batch; i++ {
-				copy(in.Data[i*256:(i+1)*256], embedding[data[position+i]][:])
+				copy(in.Data[i*Size:(i+1)*Size], embedding[data[position+i]][:])
 			}
-			index := uint64(position)
+			/*index := uint64(position)
 			for i := 0; i < 64; i++ {
 				if index&1 == 1 {
-					in.Data[256+i] = 1
+					in.Data[Size+i] = 1
 				} else {
-					in.Data[256+i] = 0
+					in.Data[Size+i] = 0
 				}
 				index >>= 1
-			}
+			}*/
 			//out := nets.Fire(in)
 			out := net.Fire(in)
 			c := 0
