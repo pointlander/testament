@@ -6,6 +6,7 @@ package main
 
 import (
 	"compress/bzip2"
+	"encoding/gob"
 	"flag"
 	"fmt"
 	"hash/fnv"
@@ -224,6 +225,8 @@ var (
 	FlagFile = flag.String("f", "10.txt.utf-8.bz2", "the file to process")
 	// FlagWander is wandering mode
 	FlagWander = flag.Bool("w", false, "wander mode")
+	// FlagSearch search the search index
+	FlagSearch = flag.String("s", "", "search the search index")
 )
 
 func main() {
@@ -316,11 +319,12 @@ func main() {
 	}
 
 	test := func(iterations int) {
-		net := NewNet(2, 8, Size, 3)
+		net := NewNet(2, 128, Size, 16)
 		in := NewMatrix(0, Size, Batch)
 		in.Data = in.Data[:cap(in.Data)]
 		position := 0
 		h := fnv.New32()
+		seen := make(map[int][]int)
 		for position < iterations {
 			for i := 0; i < Batch; i++ {
 				h.Reset()
@@ -341,16 +345,40 @@ func main() {
 			}
 			out := net.Fire(in)
 			c := 0
-			if out.Data[0] > 0 {
-				c |= 1
+			for i, v := range out.Data {
+				if v > 0 {
+					c |= 1 << i
+				}
 			}
-			if out.Data[1] > 0 {
-				c |= 2
+			if v, ok := seen[c]; ok {
+				/*begin := v - 16
+				if begin < 0 {
+					begin = 0
+				}
+				end := v + 16
+				if end > len(data) {
+					end = len(data)
+				}
+				fmt.Println()
+				fmt.Println()
+				fmt.Println("seen", len(seen), "("+string(data[begin:end])+")")
+				fmt.Println()*/
+				contains := false
+				for _, value := range v {
+					if value == position {
+						contains = true
+						break
+					}
+				}
+				if !contains {
+					v = append(v, position)
+				}
+				seen[c] = v
+				//break
+			} else {
+				seen[c] = []int{position}
 			}
-			if out.Data[2] > 0 {
-				c |= 4
-			}
-			symbol := ""
+			/*symbol := ""
 			switch c {
 			case 0:
 				symbol = color.BlackString(string(data[position]))
@@ -369,9 +397,86 @@ func main() {
 			case 7:
 				symbol = color.HiMagentaString(string(data[position]))
 			}
-			fmt.Printf(symbol)
+			fmt.Printf(symbol)*/
+			fmt.Printf(string(data[position]))
 			position++
 		}
+		output, err := os.Create("index.gob")
+		if err != nil {
+			panic(err)
+		}
+		encoder := gob.NewEncoder(output)
+		err = encoder.Encode(seen)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	if *FlagSearch != "" {
+		search := []byte(*FlagSearch)
+		input, err := os.Open("index.gob")
+		if err != nil {
+			panic(err)
+		}
+		decoder := gob.NewDecoder(input)
+		seen := make(map[int][]int)
+		err = decoder.Decode(&seen)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(len(seen))
+
+		net := NewNet(2, 128, Size, 16)
+		in := NewMatrix(0, Size, Batch)
+		in.Data = in.Data[:cap(in.Data)]
+		position := 0
+		h := fnv.New32()
+		for position < len(search) {
+			for i := 0; i < Batch; i++ {
+				h.Reset()
+				h.Write(search[position+i : position+i+1])
+				rng := rand.New(rand.NewSource(int64(h.Sum32())))
+				embedding := [256]float32{}
+				sum := 0.0
+				for i := range embedding {
+					v := rng.NormFloat64()
+					sum += v * v
+					embedding[i] = float32(v)
+				}
+				length := float32(math.Sqrt(sum))
+				for i, v := range embedding {
+					embedding[i] = v / length
+				}
+				copy(in.Data[i*Size:(i+1)*Size], embedding[:])
+			}
+			out := net.Fire(in)
+			c := 0
+			for i, v := range out.Data {
+				if v > 0 {
+					c |= 1 << i
+				}
+			}
+			fmt.Printf(string(search[position]))
+			if value, ok := seen[c]; ok {
+				fmt.Println(value)
+				for _, v := range value {
+					begin := v - 16
+					if begin < 0 {
+						begin = 0
+					}
+					end := v + 16
+					if end > len(data) {
+						end = len(data)
+					}
+					fmt.Println()
+					fmt.Println()
+					fmt.Println("seen", len(seen), "("+string(data[begin:end])+")")
+					fmt.Println()
+				}
+			}
+			position++
+		}
+		return
 	}
 
 	test(len(data))
